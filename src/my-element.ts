@@ -1,7 +1,11 @@
-import { LitElement, css, html } from 'lit'
-import { customElement, property } from 'lit/decorators.js'
-import litLogo from './assets/lit.svg'
-import viteLogo from '/vite.svg'
+import { LitElement, css, html } from 'lit';
+import { interpret } from 'xstate';
+
+import { customElement, property } from 'lit/decorators.js';
+import litLogo from './assets/lit.svg';
+import viteLogo from '/vite.svg';
+
+import { counter } from './countMachine';
 
 /**
  * An example element.
@@ -9,19 +13,36 @@ import viteLogo from '/vite.svg'
  * @slot - This element has a slot
  * @csspart button - The button
  */
+
 @customElement('my-element')
 export class MyElement extends LitElement {
   /**
    * Copy for the read the docs hint.
    */
   @property()
-  docsHint = 'Click on the Vite and Lit logos to learn more'
+  docsHint = 'Click on the Vite and Lit logos to learn more';
 
-  /**
-   * The number of times the button has been clicked.
-   */
-  @property({ type: Number })
-  count = 0
+  service = interpret(counter);
+
+  @property({ attribute: false })
+  state = this.service.initialState;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+
+    this.service.onTransition((state, event) => {
+      this.state = state;
+      const label = `[${this.service.id}]`.toUpperCase();
+      console.log(label, event, state.value);
+    });
+
+    this.service.start({});
+  }
+
+  // Stop service on removal from the Light DOM
+  disconnectedCallback(): void {
+    this.service.stop();
+  }
 
   render() {
     return html`
@@ -36,15 +57,21 @@ export class MyElement extends LitElement {
       <slot></slot>
       <div class="card">
         <button @click=${this._onClick} part="button">
-          count is ${this.count}
+          count is ${this.state.context.count}
         </button>
+        <button @click=${this._handleReset} part="button">reset</button>
       </div>
       <p class="read-the-docs">${this.docsHint}</p>
-    `
+    `;
   }
 
   private _onClick() {
-    this.count++
+    this.service.send({ type: 'Toggle' });
+  }
+
+  private _handleReset() {
+    console.log('this.service', this.service);
+    this.service.send({ type: 'Reset' });
   }
 
   static styles = css`
@@ -117,11 +144,11 @@ export class MyElement extends LitElement {
         background-color: #f9f9f9;
       }
     }
-  `
+  `;
 }
 
 declare global {
   interface HTMLElementTagNameMap {
-    'my-element': MyElement
+    'my-element': MyElement;
   }
 }
